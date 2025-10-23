@@ -1,52 +1,40 @@
-# main.py
-print("--- main.py execution started ---") # ADD THIS VERY FIRST
+print("--- main.py execution started ---") # DEBUG PRINT
 import os
-print("os imported.") # ADD THIS
+print("os imported.") # DEBUG PRINT
+bot = None # Initialize bot to None
+keep_alive = None # Initialize keep_alive to None
+
 try:
     from keep_alive import keep_alive
-    print("keep_alive imported.") # ADD THIS
-    import bot
-    print("bot imported.") # ADD THIS
+    print("keep_alive imported successfully.") # DEBUG PRINT
+    import bot # Assuming your main bot logic is in bot.py
+    print("bot imported successfully.") # DEBUG PRINT
 except ImportError as e:
-    print(f"!!! IMPORT ERROR: {e}") # ADD THIS TO CATCH IMPORT FAILURES
-    # Consider exiting if imports fail:
+    print(f"!!! IMPORT ERROR: {e}") # DEBUG PRINT - Crucial to see if files are found
+    # Optional: Exit if essential imports fail
     # import sys
-    # sys.exit(1)
-
-print("Attempting to call keep_alive()...") # ADD THIS
-keep_alive()
-print("keep_alive() called. Background server thread should be starting.") # ADD THIS
-
-print("Attempting to call bot.run_bot()...") # ADD THIS
-try:
-    bot.run_bot()
+    # sys.exit(f"Stopping due to import error: {e}")
 except Exception as e:
-    print(f"!!! ERROR DURING bot.run_bot(): {e}") # ADD THIS
+    print(f"!!! UNEXPECTED ERROR during import: {e}") # DEBUG PRINT
 
-print("--- main.py finished (should not happen if bot runs forever) ---") # ADD THIS
+# Check if imports were successful before proceeding
+if keep_alive is None:
+    print("!!! keep_alive function was not imported. Cannot start web server.")
+if bot is None:
+    print("!!! bot module was not imported. Cannot start Discord bot.")
 
-from keep_alive import keep_alive
-import bot # Imports the code from bot.py
-import os
+if keep_alive and bot: # Only proceed if both imports worked
+    print("Attempting to call keep_alive()...") # DEBUG PRINT
+    keep_alive()
+    print("keep_alive() called. Background server thread should be starting.") # DEBUG PRINT
 
-# --- Optional: Load .env file for local testing ---
-# Make sure you have a .env file in the same directory
-# with your secrets if you run this locally.
-# DO NOT UPLOAD .env TO GITHUB
-# from dotenv import load_dotenv
-# load_dotenv()
-# print("Attempting to load secrets from .env file for local testing...")
-# print(f"Discord Token Loaded: {'Yes' if os.getenv('DISCORD_TOKEN') else 'No'}")
-# print(f"Spotify Client ID Loaded: {'Yes' if os.getenv('SPOTIPY_CLIENT_ID') else 'No'}")
-# print(f"Spotify Client Secret Loaded: {'Yes' if os.getenv('SPOTIPY_CLIENT_SECRET') else 'No'}")
-# ----------------------------------------------------
+    print("Attempting to call bot.run_bot()...") # DEBUG PRINT
+    try:
+        bot.run_bot() # Calls the function from bot.py to start the bot
+    except Exception as e:
+        print(f"!!! ERROR DURING bot.run_bot() CALL: {e}") # DEBUG PRINT
 
-# Start the Flask web server in a background thread
-# This needs to run so Render can ping it and keep the bot alive
-keep_alive()
-print("Keep alive server started.")
+else:
+    print("!!! Skipping keep_alive() and bot.run_bot() due to import errors.")
 
-# Start the Discord bot
-print("Starting the Discord bot...")
-
-bot.run_bot() # Calls the function from bot.py to start the bot
+print("--- main.py reached end (this should ideally not happen if bot runs forever) ---") # DEBUG PRINT
