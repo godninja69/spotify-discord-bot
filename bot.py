@@ -157,12 +157,18 @@ async def add_artists(ctx, *, artist_links: str):
         await ctx.send("❌ Cannot add artists, Spotify connection is not available.")
         return
 
+    # --- DEBUGGING: Check and potentially fix the type ---
+    if not isinstance(artists_to_track_set, set):
+        print(f"⚠️ WARNING: artists_to_track_set was type {type(artists_to_track_set)}, expected set. Resetting to empty set.")
+        await ctx.send("⚠️ Internal warning: Artist tracking list had unexpected type, resetting. Please try adding again.")
+        artists_to_track_set = set() # Reset to an empty set
+    # --------------------------------------------------
+
     added_artists_names = []
     failed_artists_input = []
     already_tracked_count = 0
 
     # Regex to find Spotify artist URLs or URIs more robustly
-    # Looks for the 22-character base-62 ID
     spotify_link_pattern = re.compile(r'(?:https?://open\.spotify\.com/artist/|spotify:artist:)([a-zA-Z0-9]{22})')
 
     matches = spotify_link_pattern.finditer(artist_links)
@@ -180,31 +186,59 @@ async def add_artists(ctx, *, artist_links: str):
                 print(f"Attempting to verify artist URI: {artist_uri}")
                 artist_info = sp.artist(artist_uri) # This is the API call that might fail
                 artist_name = artist_info.get('name', f'ID:{artist_id}')
-                artists_to_track_set.add(artist_uri)
-                added_artists_names.append(artist_name)
-                print(f"✅ Successfully added artist: {artist_name} ({artist_uri})")
+                # ---- Ensure it's still a set before adding ----
+                if isinstance(artists_to_track_set, set):
+                     artists_to_track_set.add(artist_uri) # <<< This is the line causing AttributeError
+                     added_artists_names.append(artist_name)
+                     print(f"✅ Successfully added artist: {artist_name} ({artist_uri})")
+                else:
+                    # Should not happen if the check at the start worked, but as a safeguard
+                    print(f"ERROR: artists_to_track_set became {type(artists_to_track_set)} mid-command!")
+                    failed_artists_input.append(f"`{original_input}` (Internal Type Error)")
 
-            # --- MORE SPECIFIC ERROR CATCHING ---
             except spotipy.exceptions.SpotifyException as se:
-                # Provides Spotify's error message, status code, and reason
                 error_details = f"Spotify API Error (Status: {se.http_status}, Code: {se.code}, Reason: {se.msg})"
                 failed_artists_input.append(f"`{original_input}` ({error_details})")
                 print(f"❌ Failed to verify/add {artist_uri} - {error_details}")
             except Exception as e:
-                # Catches any other error (network issues, unexpected responses, etc.)
                 error_type = type(e).__name__
                 failed_artists_input.append(f"`{original_input}` (Error Type: {error_type})")
                 print(f"❌ Failed to verify/add {artist_uri} - An unexpected error occurred: {error_type} - {e}")
-                # Print the full traceback to logs for detailed debugging:
-                print("Full Traceback:") # Keep this print
-                traceback.print_exc() # *** THIS LINE IS NOW UNCOMMENTED ***
-            # ------------------------------------
+                print("Full Traceback:")
+                traceback.print_exc()
 
         else:
             already_tracked_count += 1
             print(f"ℹ️ Artist already tracked: {artist_uri}")
 
         await asyncio.sleep(0.1) # Small delay between checking each artist
+
+    # --- Feedback Message ---
+    # (Rest of the feedback message code remains the same as before)
+    if found_links_count == 0:
+        await ctx.send("❌ No valid Spotify artist links or URIs found in your message. Use the format `https://open.spotify.com/playlist/5LA0xQetL5h7RXKjwBol031...` or `spotify:artist:ID...`")
+        return
+
+    response_message = ""
+    if added_artists_names:
+        response_message += f"✅ Added **{len(added_artists_names)}** artist(s) to track:\n- "
+        response_message += "\n- ".join(added_artists_names)
+        response_message += "\n\n"
+
+    if already_tracked_count > 0:
+        response_message += f"ℹ️ **{already_tracked_count}** provided artist(s) were already being tracked.\n\n"
+
+    if failed_artists_input:
+        response_message += f"⚠️ Failed to add or verify **{len(failed_artists_input)}** artist link(s)/URI(s):\n- "
+        response_message += "\n- ".join(failed_artists_input)
+        response_message += "\n"
+
+    # Optional: Save the updated artists_to_track_set to a file here for persistence across restarts
+    # Example: save_artists_to_file(artists_to_track_set)
+
+    if len(response_message) > 1950:
+        response_message = response_message[:1950] + "... (message too long)"
+    await ctx.send(response_message.strip())
 
     # --- Feedback Message ---
     if found_links_count == 0:
@@ -885,3 +919,4 @@ def run_bot():
 # artists_to_track_set = load_artists_from_file()
 # print(f"Loaded {len(artists_to_track_set)} artists.")
 # --------------------------------------------------
+
